@@ -1,6 +1,7 @@
 ''''LZ78 algorithm'''
 
-from math import log2
+from math import log2, inf
+from pathlib import Path
 
 from bitarray import bitarray
 from bitarray.util import ba2int
@@ -14,16 +15,16 @@ def encode(dict_size: int):
 
 
 def decode(file: str):
-    dict_size = 0
+    entry_index = 1
     dictionary = [bytearray()]
     output_buffer = bytearray()
     with open(file, mode='rb') as f:
         input_buffer = bitarray()
         input_buffer.fromfile(f)
-        k = ba2int(input_buffer[0:4])
-        n = 2 ** k
+        k = ba2int(input_buffer[:4])
+        n = 2 ** k if k > 0 else inf
         while len(input_buffer) > 0:
-            index_len = int(log2(dict_size if dict_size > 0 else 1))
+            index_len = int(log2(entry_index))
 
             index = ba2int(input_buffer[:index_len])
             word = input_buffer[index_len:index_len + 8]
@@ -32,12 +33,18 @@ def decode(file: str):
             entry.extend(dictionary[index])
             entry.append(word)
 
-            if len(dictionary) < n:
+            if n is inf or len(dictionary) < n:
                 dictionary.append(entry)
             output_buffer.extend(entry)
 
             input_buffer = input_buffer[index_len + 8:]
-    pass
+            entry_index = entry_index + 1
+
+    file_path = Path(file)
+
+    if file_path.suffix == '.compressed':
+        with open(file_path.stem, mode='wb') as out:
+            out.write(output_buffer)
 
 
 if __name__ == "__main__":
