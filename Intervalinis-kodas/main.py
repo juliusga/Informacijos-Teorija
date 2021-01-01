@@ -3,8 +3,17 @@ from math import log2
 from bitarray import bitarray
 from bitarray.util import int2ba, ba2int
 import itertools
+import os
 # 1 bitas - c1 ? c2 = 0 ? 1
 # 4 bitai - k
+
+# For printing the files in binary format
+def print_file_binary(file):
+    with open(file, mode='rb') as f:
+        file_buffer = bitarray()
+        file_buffer.fromfile(f)
+        print("File <" + file + ">:", file_buffer.to01(), "\n")
+
 
 def generate_gamma(index: int):
     #uk = 000...000(k+1)_2
@@ -76,67 +85,51 @@ def encode(file:str, is_c1: bool, k: int):
     with open(file + '.compressed', mode='wb') as out:
         out_buffer.tofile(out)
 
-def print_file_binary(file):
-    with open(file, mode='rb') as f:
-        file_buffer = bitarray()
-        file_buffer.fromfile(f)
-        print("File <" + file + ">:", file_buffer.to01(), "\n")
-
 
 def decode(file: str):
     with open(file, mode='rb') as f:
         input_buffer = bitarray()
         input_buffer.fromfile(f)
-        is_c1 = input_buffer.pop(0)  # First bit indicates whether it is c1 or c2
-        k = ba2int(input_buffer[0:4]) + 1 # Following next 4 bits define word length.
+        is_c1 = input_buffer.pop(0)         # First bit indicates whether it is c1 or c2
+        k = ba2int(input_buffer[0:4]) + 1   # Following next 4 bits define word length.
         input_buffer = input_buffer[4:]
-        print("is_C1, k, input_buffer:", is_c1, k, input_buffer)
 
-        output_buffer = bitarray()        # Buffer with ABC
+        output_buffer = bitarray()          # Buffer with ABC
         output_buffer.extend(''.join(initialize_abc(k)))
-        print("Output buffer", output_buffer.to01())
 
-        # 000110000 0001000 1 1  0110 <- input buffer
-        # (abc) 2 1 1 1 2 <- output buffer
-        i_b_init_size = len(input_buffer)
-        if is_c1:
-            while len(input_buffer) != 0:
-                print("input buffer:", ('{:>' + str(i_b_init_size) + '}').format(input_buffer.to01()))
-                zero_counter = 0
+        while len(input_buffer) != 0:
+            zero_counter = 0
+            try:
                 while input_buffer[zero_counter] != True:
                     zero_counter += 1
+            except IndexError:              # If the ending zeros reached
+                break
+
+            if is_c1:
                 word_len = zero_counter * 2 + 1
                 distance = generate_gamma_inv(input_buffer[0:word_len])
-                print("Distance:", distance)
-                if distance == 0:
-                    decoded_word = output_buffer[-k * (distance + 1):]
-                else:
-                    decoded_word = output_buffer[-k * (distance + 1): -distance * k]
-                output_buffer.extend(decoded_word)
-                print("decoded word:", decoded_word)
-                input_buffer = input_buffer[word_len:]
-                print("output buffer", output_buffer[(2 ** k) * k:].to01())
 
-        '''
-        else:
-            while True:
-                if input_buffer[0] == True:
-                    input_buffer.pop(0)
-                    decoded.extend(abc[0])
-                else:
-                    zero_counter = 0
-                    while input_buffer[zero_counter] != True:
-                        zero_counter += 1
-                    u_lenght = 2 * zero_counter + 1
-                    m_k = generate_gamma_inv(input_buffer[0:u_lenght])
-                    v_k_len = 1 + m_k + 2 * int(log2(1 + m_k))
-                    current_word = bitarray()
-                    for i in range(v_k_len):
-                        current_word.append(input_buffer.pop(0))
-                    decoded.extend(abc[generate_delta_inv(current_word)])
-                    print(decoded)
-         '''
+            else:
+                u_lenght = 2 * zero_counter + 1
+                m_k = generate_gamma_inv(input_buffer[0:u_lenght])
+                word_len = 1 + m_k + 2 * int(log2(1 + m_k))
+                distance = generate_delta_inv(input_buffer[0:word_len])
 
+            if distance == 0:
+                decoded_word = output_buffer[-k * (distance + 1):]
+            else:
+                decoded_word = output_buffer[-k * (distance + 1): -distance * k]
+
+            output_buffer.extend(decoded_word)
+            input_buffer = input_buffer[word_len:]  # Pop the read word out of the buffer
+
+    file_name_ext = os.path.splitext(file)[0]              # Split the file name.(extension) and the .compressed
+    file_name, ext = os.path.splitext(file_name_ext)       # Split the file name and the real extension
+    with open(file_name + '_decompressed' + ext, mode='wb') as out:
+        output_buffer[(2 ** k) * k:].tofile(out)    # Output buffer without the added ABC
+        print("FILE", '<' + file + '>', "DECOMPRESSED TO", '<' + file_name + '_decompressed' + ext + '>')
+
+        
 # init
 if __name__ == "__main__":
     if False:
@@ -155,8 +148,11 @@ if __name__ == "__main__":
             print(delta.copy(), "=>", 'v' + str(generate_delta_inv(delta.copy())))
             print()
 
-    print_file_binary("test_gamma.txt")
-
     decode('test_gamma.txt.compressed')
+        
+    decode('test_delta.txt.compressed')
 
-    print('\n')
+    decode("image_delta.bmp.compressed")
+
+    decode("image_gamma.bmp.compressed")
+
