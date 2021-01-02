@@ -24,8 +24,8 @@ def decode(file: str):
         k = ba2int(input_buffer[:5])
         n = 2 ** k if k > 0 else inf
         input_buffer = input_buffer[5:]
-        while len(input_buffer) > 0:
-            index_len = int(log2(entry_index))
+        while len(input_buffer) > 8:
+            index_len = int(log2(entry_index)) + 1
 
             index = ba2int(input_buffer[:index_len])
             word = input_buffer[index_len:index_len + 8]
