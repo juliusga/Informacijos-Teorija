@@ -15,7 +15,7 @@ from bitarray.util import ba2int, int2ba
 
 def encode(dict_size: int, file: str):
     output_buffer = bitarray()
-    output_buffer.extend(int2ba(dict_size))
+    output_buffer.extend(int2ba(dict_size, length=5))
 
     dictionary = [0]
     elements_added = 0
@@ -25,7 +25,6 @@ def encode(dict_size: int, file: str):
         input_buffer = bitarray()
         input_buffer.fromfile(f)
 
-    output_buffer = bitarray()
     entry_index_len = 0     # Used to calculate bit lenght for dictionary entry
     end_reached = False
     last_read_entry = None
@@ -100,7 +99,7 @@ def decode(file: str):
 
             entry = bytearray()
             entry.extend(dictionary[index])
-            entry.append(word)
+            entry.append(int(word.to01(), 2))
 
             if n is inf or len(dictionary) < n:
                 dictionary.append(entry)
@@ -111,16 +110,18 @@ def decode(file: str):
 
     file_path = Path(file)
 
-    if file_path.suffix == '.compressed':
-        with open(file_path.stem, mode='wb') as out:
+    if file_path.suffix.startswith('.compressed'):
+        with open(file_path.stem + '.uncompressed', mode='wb') as out:
             out.write(output_buffer)
+    print(output_buffer)
 
 
 if __name__ == "__main__":
     print('\n')
     encode(0, 'test_text.txt')
-    encode(0, 'test_text_longer.txt')
-    encode(0, 'test_image.bmp')
-    encode(2, 'test_text.txt')
-    encode(2, 'test_text_longer.txt')
-    encode(2, 'test_image.bmp')
+    #encode(0, 'test_text_longer.txt')
+    #encode(0, 'test_image.bmp')
+    # encode(2, 'test_text.txt')
+    # encode(2, 'test_text_longer.txt')
+    # encode(2, 'test_image.bmp')
+    decode('test_text.txt.compressed0')
