@@ -24,10 +24,10 @@ def encode(dict_size: int, file: str):
     with open(file, mode='rb') as f:
         input_buffer = bitarray()
         input_buffer.fromfile(f)
+        print("input:", input_buffer.to01())
 
     entry_index_len = 0     # Used to calculate bit lenght for dictionary entry
     end_reached = False
-    last_read_entry = None
     while len(input_buffer) > 0:
         index_in_dic = 0
 
@@ -35,22 +35,30 @@ def encode(dict_size: int, file: str):
         bytes_read = 0
         while True:
             bytes_read += 1
+            # End of input buffer reached
             if input_buffer[0 : 8 * bytes_read].tobytes() not in dictionary:
-                last_read_entry = input_buffer[0 : 8 * bytes_read].tobytes()
                 # Symbol that is going to be encoded into the entry
                 entry_symbol = input_buffer[8 * (bytes_read - 1) : 8 * bytes_read]
                 if bytes_read != 1:
                     entry_to_extend = input_buffer[0 : 8 * (bytes_read - 1)].tobytes()
                     index_in_dic = dictionary.index(entry_to_extend)
                 break
-            # End of input buffer reached
-            if len(input_buffer) < 8 * (bytes_read + 1):
+            elif len(input_buffer) < 8 * (bytes_read):
                 end_reached = True
                 break
 
         # if the end of input buffer reached, simply put the index from dictionary
         if end_reached:
-            output_buffer.extend(int2ba(index_in_dic))
+            output_to_add = bitarray(2 ** entry_index_len)                  # Maximum amount of bits needed
+            output_to_add.setall(False)
+            entry_to_extend = input_buffer.tobytes()
+            pointer_to_entry = int2ba(dictionary.index(entry_to_extend))    # Index to be added
+            # After the index is added, we remove overflow zeros
+            zeros_to_remove = len(pointer_to_entry)         
+            output_to_add.extend(pointer_to_entry)
+            output_to_add = output_to_add[zeros_to_remove:]
+            print("last", output_to_add, 2 ** entry_index_len)
+            output_buffer.extend(output_to_add)
             break
         
         # Adding entries to the dictionary
@@ -68,9 +76,11 @@ def encode(dict_size: int, file: str):
         output_to_add = output_to_add[zeros_to_remove:]
         output_to_add.extend(entry_symbol)              # Adding the symbol which extends dict element
         output_buffer.extend(output_to_add)
+        print(output_to_add.to01())
 
         elements_added += 1
         elements_added_bits += 1
+        print(elements_added, elements_added_bits, entry_index_len)
         if elements_added > 2 ** entry_index_len:
             entry_index_len += 1
             elements_added_bits = 1
@@ -78,7 +88,13 @@ def encode(dict_size: int, file: str):
         input_buffer = input_buffer[8 * bytes_read:]
 
     with open(file + '.compressed' + str(dict_size), mode='wb') as out:
+        output_buffer.fill()
         out.write(output_buffer)
+
+    with open(file + '.compressed' + str(dict_size), mode='rb') as inp:
+        buffer = bitarray()
+        buffer.fromfile(inp)
+        print("file:", buffer.to01())
 
 
 def decode(file: str):
@@ -118,10 +134,10 @@ def decode(file: str):
 
 if __name__ == "__main__":
     print('\n')
-    encode(0, 'test_text.txt')
-    #encode(0, 'test_text_longer.txt')
+    # encode(0, 'test_text.txt')
+    encode(0, 'test_text_longer.txt')
     #encode(0, 'test_image.bmp')
     # encode(2, 'test_text.txt')
     # encode(2, 'test_text_longer.txt')
     # encode(2, 'test_image.bmp')
-    decode('test_text.txt.compressed0')
+    # decode('test_text.txt.compressed0')
