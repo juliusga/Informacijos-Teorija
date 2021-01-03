@@ -1,10 +1,9 @@
 ''''LZ78 algorithm'''
 
-from math import log2, inf, floor
+from math import log2, inf
 from pathlib import Path
 from bitarray import bitarray
 from bitarray.util import ba2int, int2ba
-
 
 # 5 PIRMI BITAI - K (0 - 31) (0 - inf)
 # K | Dictionary size
@@ -31,7 +30,7 @@ def encode(dict_size: int, file: str):
             bits_read += 8
             if bits_read > len(input_buffer):
                 entry_symbol = None
-                entry_index = dictionary.index(input_buffer.tobytes())
+                entry_index = dictionary.index(input_buffer.tobytes()) + 1
                 break
             elif input_buffer[0 : bits_read].tobytes() not in dictionary:
                 entry_symbol = input_buffer[bits_read - 8:bits_read]
@@ -69,46 +68,54 @@ def decode(file: str):
         n = 2 ** k if k > 0 else inf
         input_buffer = input_buffer[5:]
         input_len = len(input_buffer)
-        while input_len > 0:
+        current_index = 0
+        while input_len - current_index > 0:
             index_len = int(log2(entry_index - 1 if entry_index > 1 else 1)) + 1  # 1 - 0, 2 - 0,1, 3-0,1,2, 4-0,1,2,3.
             # 1,2 - 1 bit, 3,4 - 2 bits, 5,6,7,8-3 bits, 9,10,11,12,13,14,15,16 - 4 bits
 
-            index = ba2int(input_buffer[:index_len])
+            index = ba2int(input_buffer[current_index:current_index + index_len])
 
             entry = bytearray()
             entry.extend(dictionary[index])
 
-            if input_len - index_len > 8:
-                word = input_buffer[index_len:index_len + 8]
-                entry.append(int(word.to01(), 2))
-                input_buffer = input_buffer[index_len + 8:]
+            if (input_len - current_index) - index_len > 8:
+                word = input_buffer[current_index + index_len:current_index + index_len + 8]
+                entry.append(ba2int(word))
+                current_index = current_index + index_len + 8
                 entry_index = entry_index + 1
-                input_len = len(input_buffer)
             else:
-                input_len = 0
+                current_index = input_len
 
-            if n is inf or len(dictionary) < n:
+            if n is inf or len(dictionary) <= n:
                 dictionary.append(entry)
             output_buffer.extend(entry)
 
     file_path = Path(file)
 
     if file_path.suffix.startswith('.compressed'):
-        with open(file_path.stem + '.uncompressed', mode='wb') as out:
+        out_filename = file_path.stem + '.uncompressed'
+        with open(out_filename, mode='wb') as out:
             out.write(output_buffer)
-    print(output_buffer)
+            print(f"FILE <{file}> DECOMPRESSED TO <{out_filename}>")
 
 
 if __name__ == "__main__":
     print('\n')
-    encode(0, 'test_text.txt')
-    encode(0, 'test_text_longer.txt')
-    encode(0, 'test_image.bmp')
-    encode(1, 'test_text.txt')
-    encode(1, 'test_text_longer.txt')
-    encode(1, 'test_image.bmp')
-    encode(2, 'test_text.txt')
-    encode(2, 'test_text_longer.txt')
-    encode(2, 'test_image.bmp')
+    # encode(0, 'test_text.txt')
+    # encode(0, 'test_text_longer.txt')
+    # encode(0, 'test_image.bmp')
+    # encode(1, 'test_text.txt')
+    # encode(1, 'test_text_longer.txt')
+    # encode(1, 'test_image.bmp')
+    # encode(2, 'test_text.txt')
+    # encode(2, 'test_text_longer.txt')
+    # encode(2, 'test_image.bmp')
     # decode('test_text.txt.compressed0')
+    # decode('test_text.txt.compressed1')
+    # decode('test_text.txt.compressed2')
     # decode('test_text_longer.txt.compressed0')
+    # decode('test_text_longer.txt.compressed1')
+    # decode('test_text_longer.txt.compressed2')
+    # decode('test_image.bmp.compressed0')
+    # decode('test_image.bmp.compressed1')
+    # decode('test_image.bmp.compressed2')
