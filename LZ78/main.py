@@ -110,9 +110,9 @@ def decode(file: str):
         n = 2 ** k if k > 0 else inf
         input_buffer = input_buffer[5:]
         input_len = len(input_buffer)
-        while input_len > 8:
-            index_len = int(log2(entry_index if entry_index > 1 else 2))  # 1 - 0, 2 - 0,1, 3-0,1,2, 4-0,1,2,3. 1,
-            # 2 - 1 bit, 3,4 - 2 bits, 5,6,7,8-3 bits
+        while input_len > 0:
+            index_len = int(log2(entry_index - 1 if entry_index > 1 else 1)) + 1  # 1 - 0, 2 - 0,1, 3-0,1,2, 4-0,1,2,3.
+            # 1,2 - 1 bit, 3,4 - 2 bits, 5,6,7,8-3 bits, 9,10,11,12,13,14,15,16 - 4 bits
 
             index = ba2int(input_buffer[:index_len])
 
@@ -126,7 +126,7 @@ def decode(file: str):
                 entry_index = entry_index + 1
                 input_len = len(input_buffer)
             else:
-                input_buffer = input_buffer[index_len:]
+                input_len = 0
 
             if n is inf or len(dictionary) < n:
                 dictionary.append(entry)
@@ -149,3 +149,4 @@ if __name__ == "__main__":
     # encode(2, 'test_text_longer.txt')
     # encode(2, 'test_image.bmp')
     decode('test_text.txt.compressed0')
+    decode('test_text_longer.txt.compressed0')
