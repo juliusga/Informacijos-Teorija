@@ -2,8 +2,10 @@
 
 from math import log2, inf
 from pathlib import Path
+
 from bitarray import bitarray
 from bitarray.util import ba2int, int2ba
+
 
 # 5 PIRMI BITAI - K (0 - 31) (0 - inf)
 # K | Dictionary size
@@ -32,7 +34,7 @@ def encode(dict_size: int, file: str):
                 entry_symbol = None
                 entry_index = dictionary.index(input_buffer.tobytes()) + 1
                 break
-            elif input_buffer[0 : bits_read].tobytes() not in dictionary:
+            elif input_buffer[0: bits_read].tobytes() not in dictionary:
                 entry_symbol = input_buffer[bits_read - 8:bits_read]
                 entry_index = 0 if bits_read == 8 else dictionary.index(input_buffer[0:bits_read - 8].tobytes()) + 1
                 break
@@ -44,12 +46,12 @@ def encode(dict_size: int, file: str):
         # Add entries to output
         length_of_index = 1 if entries_added == 0 else int(log2(entries_added)) + 1
         output_buffer.extend(int2ba(entry_index, length=length_of_index))
-        if entry_symbol != None:
+        if entry_symbol is not None:
             output_buffer.extend(entry_symbol)
         entries_added += 1
 
         # Shrink the input buffer
-        input_buffer = input_buffer[bits_read:] if entry_symbol != None else bitarray()
+        input_buffer = input_buffer[bits_read:] if entry_symbol is not None else bitarray()
 
     with open(file + '.compressed' + str(dict_size), mode='wb') as out:
         output_buffer.fill()
