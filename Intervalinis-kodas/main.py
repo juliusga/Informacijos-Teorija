@@ -95,7 +95,7 @@ def encode(in_file, out_file, is_c1: bool, k: int):
 
     out_buffer.fill()
     out_file.write(out_buffer)
-    print(out_file)
+    # print(out_buffer)
     print("FILE", f'<{in_file.name}>', "COMPRESSED TO", f'<{out_file.name}>')
 
 
