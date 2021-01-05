@@ -2,6 +2,8 @@
 import itertools
 import os
 from math import log2
+import argparse
+
 
 from bitarray import bitarray
 from bitarray.util import int2ba, ba2int
@@ -61,7 +63,7 @@ def initialize_abc(k: int):
     return [''.join(seq) for seq in itertools.product('01', repeat=k)]
 
 
-def encode(file: str, is_c1: bool, k: int):
+def encode(in_file, out_file, is_c1: bool, k: int):
     out_buffer = bitarray()
     out_buffer.append(is_c1)
     out_buffer.extend(int2ba(k - 1, length=4))
@@ -71,75 +73,85 @@ def encode(file: str, is_c1: bool, k: int):
     pcode_gen_func = generate_gamma if is_c1 else generate_delta
     #  Select p code generator function.
 
-    with open(file, mode='rb') as f:
-        input_buffer = bitarray()
-        input_buffer.extend(''.join(initialize_abc(k)))  # Fill with ABC.
-        input_buffer.fromfile(f)  # Fill with data from file.
-        buffer_len = len(input_buffer)
+    input_buffer = bitarray()
+    input_buffer.extend(''.join(initialize_abc(k)))  # Fill with ABC.
+    input_buffer.fromfile(in_file)  # Fill with data from file.
+    buffer_len = len(input_buffer)
 
-        for word_index in range(k * 2 ** k, buffer_len, k):  # start from file beginning.
-            word = input_buffer[word_index:word_index + k]
-            for prev_word_index in range(word_index, 0, -k):  # Read from abc beginning to the current index.
-                prev_word = input_buffer[prev_word_index - k:prev_word_index]
-                if word == prev_word:
-                    out_buffer.extend(pcode_gen_func((word_index - prev_word_index) // k))
-                    break
-
-    with open(file + '.compressed', mode='wb') as out:
-        out_buffer.tofile(out)
-        print("FILE", f'<{file}>', "COMPRESSED TO", f'<{file + ".compressed"}>')
-
-
-def decode(file: str):
-    with open(file, mode='rb') as f:
-        input_buffer = bitarray()
-        input_buffer.fromfile(f)
-        is_c1 = input_buffer.pop(0)  # First bit indicates whether it is c1 or c2
-        k = ba2int(input_buffer[0:4]) + 1  # Following next 4 bits define word length.
-        input_buffer = input_buffer[4:]
-
-        output_buffer = bitarray()  # Buffer with ABC
-        output_buffer.extend(''.join(initialize_abc(k)))
-
-        while len(input_buffer) != 0:
-            zero_counter = 0
-            try:
-                while not input_buffer[zero_counter]:
-                    zero_counter += 1
-            except IndexError:  # If the ending zeros reached
+    for word_index in range(k * 2 ** k, buffer_len, k):  # start from file beginning.
+        word = input_buffer[word_index:word_index + k]
+        for prev_word_index in range(word_index, 0, -k):  # Read from abc beginning to the current index.
+            prev_word = input_buffer[prev_word_index - k:prev_word_index]
+            if word == prev_word:
+                out_buffer.extend(pcode_gen_func((word_index - prev_word_index) // k))
                 break
 
-            if is_c1:
-                word_len = zero_counter * 2 + 1
-                distance = generate_gamma_inv(input_buffer[0:word_len])
+    out_file.write(out_buffer)
+    print(out_file)
+    print("FILE", f'<{in_file.name}>', "COMPRESSED TO", f'<{out_file.name}>')
 
-            else:
-                u_length = 2 * zero_counter + 1
-                m_k = generate_gamma_inv(input_buffer[0:u_length])
-                word_len = 1 + m_k + 2 * int(log2(1 + m_k))
-                distance = generate_delta_inv(input_buffer[0:word_len])
 
-            if distance == 0:
-                decoded_word = output_buffer[-k * (distance + 1):]
-            else:
-                decoded_word = output_buffer[-k * (distance + 1): -distance * k]
+def decode(in_file, out_file):
+    input_buffer = bitarray()
+    input_buffer.fromfile(in_file)
+    is_c1 = input_buffer.pop(0)  # First bit indicates whether it is c1 or c2
+    k = ba2int(input_buffer[0:4]) + 1  # Following next 4 bits define word length.
+    input_buffer = input_buffer[4:]
 
-            output_buffer.extend(decoded_word)
-            input_buffer = input_buffer[word_len:]  # Pop the read word out of the buffer
+    output_buffer = bitarray()  # Buffer with ABC
+    output_buffer.extend(''.join(initialize_abc(k)))
 
-    file_name_ext = os.path.splitext(file)[0]  # Split the file name.(extension) and the .compressed
-    file_name, ext = os.path.splitext(file_name_ext)  # Split the file name and the real extension
-    with open(file_name + '_decompressed' + ext, mode='wb') as out:
-        output_buffer[(2 ** k) * k:].tofile(out)  # Output buffer without the added ABC
-        print("FILE", '<' + file + '>', "DECOMPRESSED TO", '<' + file_name + '_decompressed' + ext + '>')
+    current_index = 0
+    while len(input_buffer) > current_index:
+        zero_counter = 0
+        try:
+            while not input_buffer[current_index + zero_counter]:
+                zero_counter += 1
+        except IndexError:  # If the ending zeros reached
+            break
+
+        if is_c1:
+            word_len = zero_counter * 2 + 1
+            distance = generate_gamma_inv(input_buffer[current_index : current_index + word_len])
+
+        else:
+            u_length = 2 * zero_counter + 1
+            m_k = generate_gamma_inv(input_buffer[current_index : current_index + u_length])
+            word_len = 1 + m_k + 2 * int(log2(1 + m_k))
+            distance = generate_delta_inv(input_buffer[current_index : current_index + word_len])
+
+        if distance == 0:
+            decoded_word = output_buffer[-k * (distance + 1):]
+        else:
+            decoded_word = output_buffer[-k * (distance + 1): -distance * k]
+
+        output_buffer.extend(decoded_word)
+        current_index += word_len
+
+    output_buffer[(2 ** k) * k:].tofile(out_file)  # Output buffer without the added ABC
+    print(f"FILE <{in_file.name}> DECOMPRESSED TO <{out_file.name}>")
 
 
 # init
 if __name__ == "__main__":
-    decode('test_gamma.txt.compressed')
+    parser = argparse.ArgumentParser(description='(De-)Compression using Universal coding algorithm.')
+    parser.add_argument('-k', type=int, default=8, choices=range(2, 17),
+                        help='Number raised by power of 2 for word length')
+    parser.add_argument('--elias', choices=['gamma', 'delta', 'g', 'd'], type=str, default='g',
+                        help='Type of encoding')
+    parser.add_argument('--type', choices=['encode', 'decode', 'e', 'd'], type=str, required=True,
+                        help='Type of operation')
+    parser.add_argument('infile', nargs=1, type=argparse.FileType('rb'),
+                        help='File to (de-)compress')
+    parser.add_argument('outfile', nargs=1, type=argparse.FileType('wb'),
+                        help='Output file for (de-)compression')
 
-    decode('test_delta.txt.compressed')
+    args = parser.parse_args()
 
-    decode("image_delta.bmp.compressed")
-
-    decode("image_gamma.bmp.compressed")
+    if args.type == 'e' or args.type == 'encode':
+        if args.elias == 'gamma' or args.elias == 'g':
+            encode(args.infile[0], args.outfile[0], True, args.k)
+        elif args.elias == 'delta' or args.elias == 'd':
+            encode(args.infile[0], args.outfile[0], False, args.k)
+    elif args.type == 'd' or args.type == 'decode':
+        decode(args.infile[0], args.outfile[0])
