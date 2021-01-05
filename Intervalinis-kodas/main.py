@@ -1,4 +1,4 @@
-# main.py @ Intervalinis-kodas
+ # main.py @ Intervalinis-kodas
 import itertools
 import os
 from math import log2
@@ -78,14 +78,22 @@ def encode(in_file, out_file, is_c1: bool, k: int):
     input_buffer.fromfile(in_file)  # Fill with data from file.
     buffer_len = len(input_buffer)
 
-    for word_index in range(k * 2 ** k, buffer_len, k):  # start from file beginning.
+    word_index = k * 2 ** k
+    while word_index < buffer_len:
+
+        if word_index + k > buffer_len:
+            fill = word_index + k - buffer_len
+            input_buffer.extend('0' * fill)
+
         word = input_buffer[word_index:word_index + k]
         for prev_word_index in range(word_index, 0, -k):  # Read from abc beginning to the current index.
             prev_word = input_buffer[prev_word_index - k:prev_word_index]
             if word == prev_word:
                 out_buffer.extend(pcode_gen_func((word_index - prev_word_index) // k))
                 break
+        word_index = word_index + k
 
+    out_buffer.fill()
     out_file.write(out_buffer)
     print(out_file)
     print("FILE", f'<{in_file.name}>', "COMPRESSED TO", f'<{out_file.name}>')
